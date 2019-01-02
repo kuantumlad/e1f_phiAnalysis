@@ -1,0 +1,36 @@
+#ifndef setcutlimits_h
+#define setcutlimits_h
+
+#include "GetCutLimits.h"
+
+void SetCutLimits( int temp_cut_index, std::map< int, std::map<std::string, std::vector< double> > >& cut_map ){
+
+  std::vector<std::string> cut_names;
+  cut_names = {"dist_cc","dist_dcr1","dist_dcr3","dist_ecsf","dist_edep","dist_ecu","dist_ecv","dist_ecw","dist_vz"};
+
+  std::map< std::string, std::vector< std::vector< double > > > temp1;  
+  GetCutLimits(temp1);
+  
+  //std::map< int, std::map<std::string, std::vector< double> > > cut_map;
+  
+  for( int i = 0; i < 9; i++ ){
+    std::map< std::string, std::vector< double > >  temp_map;
+    
+    for( int k = 0; k < 9; k++ ){
+      int cut_lvl = 0;
+      if( i == k ){
+	//std::cout << " >> CUT LVL 1 FOR " << cut_names[k] << std::endl;
+	cut_index = temp_cut_index;		
+	temp_map[ cut_names[k] ]  = temp1[cut_names[k]][cut_index];
+      }
+      else{
+	//std::cout << " >> CUT LVL 0 FOR " << cut_names[k] << std::endl;	
+	temp_map[ cut_names[k] ] = temp1[cut_names[k]][0];
+      }            
+    }
+    cut_map[i] = temp_map;
+  }	  
+  
+  
+}
+#endif

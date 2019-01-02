@@ -1,0 +1,302 @@
+#include "TMath.h"
+#include "TH1D.h"
+#include "TH2D.h"
+#include <TFile.h>
+#include <TSystemDirectory.h>
+#include <TSystemFile.h>
+#include <TTrree.h>
+#include <TBranch.h>
+#include <TMath.h>
+#include <TString.h>
+#include "TROOT.h"
+#include "TBrowser.h"
+#include <iostream>
+#include <string>
+#include "TChain.h"
+#include "TRegexp.h"
+#include "TObject.h"
+#include "TLorentzVector.h"
+#include "TVector3.h"
+#include <map>
+#include "TCanvas.h"
+#include "TPad.h"
+#include "TBox.h"
+
+#include "ExclusiveEvents.C"
+#include "Signal.cpp"
+#include "Particles.cpp"
+#include "KaonsHistoPlotter.cpp"
+#include "ParticleHistoPlotter.cpp"
+#include "ParticleHistoFiller.cpp"
+#include "PhysicsHistoPlotter.cpp"
+#include "PhysicsHistoFiller.cpp"
+
+#include "CalcXParticle.h"
+#include "ModParticle.h"
+
+#include "testClass.cpp"
+
+void skim_exclusive( ){
+
+  std::cout << ">> STARTING E1F PHI ANALYSIS <<" << std::endl;
+
+  ParticleHistoFiller h_filler("none");
+  ParticleHistoFiller h_filler2("cutepkpX");
+  h_filler.initalizeAllHistos();
+  
+  PhysicsHistoFiller h_phyfiller("none");
+  PhysicsHistoFiller h_phyfiller2("cutepX");
+  PhysicsHistoFiller h_phyfiller3("cutepkpX");
+  PhysicsHistoFiller h_phyfiller4("cut_ekpX");
+  
+  h_phyfiller.InitAllHistos();
+  h_phyfiller2.InitAllHistos();
+  h_phyfiller3.InitAllHistos();
+  h_phyfiller4.InitAllHistos();
+
+  
+  TChain *fchain = new TChain("events");
+  fchain->Add("/Users/bclary/Documents/work/thesis_work/e1f_phiAnalysis/clas-phi/data/events.root");
+  ExclusiveEvents *ex_event = new ExclusiveEvents(fchain);
+  Long64_t nentries = fchain->GetEntries();
+  
+  TLorentzVector lv_ebeam;
+  lv_ebeam.SetPxPyPzE( 0, 0, 5.498, 5.498);
+  TLorentzVector lv_target;
+  lv_target.SetPxPyPzE( 0, 0, 0, 0.938);
+
+
+  TH1D *h_phi_epX_n = new TH1D("h_phi_epX_n","h_phi_epX_n",200, 0.4, 2.0);
+  TH1D *h_phi_epkpX_n = new TH1D("h_phi_epkpX_n","h_phi_epkpX_n",200, 0.2, 0.80);
+  TH1D *h_phi_epX_kpcut = new TH1D("h_phi_epX_kpcut","h_phi_epX_kpcut",200, 0.85, 2.0);
+  TH1D *h_phi_epkpX_phicut = new TH1D("h_phi_epkpX_phicut","h_phi_epkpX_phicut",200, 0.2, 0.60);
+  
+  TH1D *h_phi_t = new TH1D("h_phi_t","h_phi_t",100, 0.0, 2.0);
+  TH1D *h_phi_xb = new TH1D("h_phi_xb","h_phi_xb",100, 0.0, 1.0);
+  TH2D *h_phi_xbt = new TH2D("h_phi_xbt","h_phi_xbt",200,0.0, 1.0, 200, 0.0, 2.0);
+  TH2D *h_phi_q2x = new TH2D("h_phi_q2x","h_phi_q2x",200, 0.0, 1.0, 200, 0.0, 5.5);
+  TH2D *h_phi_q2t = new TH2D("h_phi_q2t","h_phi_q2t",200, 0.0, 2.0, 200, 0.0, 5.5);  
+
+  TH2D *h_q2 = new TH2D("h_q2","h_q2",200,1.0,5.5,200,1.0,5.5);
+  TH2D *h_t = new TH2D("h_t","h_t",200,0.10,2.0,200,0.10,2.0);
+  TH2D *h_xb = new TH2D("h_xb","h_xb",200,0.10,1.0,200,0.10,1.0);
+    
+  double phi_min = 1.0; double phi_max = 1.04;
+  double kp_min = 0.47; double kp_max = 0.51;
+    
+  int hel = 0;
+  
+  for( Long64_t i = 0; i < nentries; i++ ){
+    fchain->GetEntry(i);
+
+    int helicity = ((ex_event->helicity));
+    int topology = ((ex_event->topology));
+    
+    TLorentzVector lv_el = (*(ex_event->electron));       
+    TLorentzVector lv_pr = (*(ex_event->proton));
+    TLorentzVector lv_kp = (*(ex_event->kaon_pos));    
+    TLorentzVector lv_km = (*(ex_event->kaon_neg));
+    TLorentzVector lv_all_phi = lv_kp + lv_km;
+    TLorentzVector lv_kpr = lv_pr + lv_kp;
+
+    std::vector<TLorentzVector> v_lv = {lv_pr, lv_kp, lv_km};
+
+    std::vector<TLorentzVector> v_epX = { lv_ebeam, lv_target, lv_el, lv_pr };
+    std::vector<TLorentzVector> v_epkpX = { lv_ebeam, lv_target, lv_el, lv_pr, lv_kp };
+    std::vector<TLorentzVector> v_ekpX = { lv_ebeam, lv_target, lv_el, lv_kp };
+
+    TLorentzVector lv_epX = CalcXParticle(v_epX);
+    TLorentzVector lv_epkpX = CalcXParticle(v_epkpX);
+    TLorentzVector lv_ekpX = CalcXParticle(v_ekpX);
+
+    TLorentzVector lv_mod_kp;
+    lv_mod_kp.SetPxPyPzE( lv_kp.Px(), lv_kp.Py(), lv_kp.Pz(),  sqrt(lv_kp.Vect().Mag2() + (0.139*0.139)) );
+    TLorentzVector mod_epkX = lv_ebeam + lv_target - lv_el - lv_pr - lv_mod_kp;    
+
+    h_filler.FillElectronHisto(lv_el);
+    h_filler.FillProtonHisto(lv_pr);
+    h_filler.FillKaonPlusHisto(lv_kp);
+    h_filler.FillKaonMinusHisto(lv_km);    
+    
+    if( topology == 0 ){
+      TLorentzVector lv_phi = lv_kp + lv_km;
+      h_filler.FillKaonMinus0Histo(lv_km);      
+      h_filler.FillKaonPair0Histo(v_lv);      
+    }
+    else if( topology == 3 ){
+      TLorentzVector lv_phi = lv_kp + lv_km;
+      h_filler.FillKaonMinus3Histo(lv_km);
+      h_filler.FillKaonPair3Histo(v_lv);      
+    }
+    
+    /////////////////////////////////////////////////////////////////
+    //PHI MESON RESULTS
+    h_phyfiller.FillPhysicsH1(lv_epX);
+    h_phyfiller.FillPhysicsH2(lv_epkpX);      
+
+    h_phi_epX_n->Fill(lv_epX.M());
+    h_phi_epkpX_n->Fill(lv_epkpX.M());
+
+    TLorentzVector phi_lv_t(0,0,0,0);
+    double phi_t = 0.0; 
+    TLorentzVector phi_lv_q(0,0,0,0);// =  lv_ebeam - lv_el;
+    double phi_xb = 0.0;//4*lv_ebeam.E()*lv_el.E() * TMath::Sin( lv_ebeam.Vect().Angle(lv_el.Vect() )/2.0 ) * TMath::Sin( lv_ebeam.Vect().Angle(lv_el.Vect() )/2.0 ) / (2.0*lv_target.M()*(lv_ebeam.E()-lv_el.E())) ;
+    double phi_q2 = 0.0;//-phi_lv_q.Mag2();
+    
+    //CUT ON EPX MASS LOOK AT KAONS
+    if( lv_epX.M() <= phi_max && lv_epX.M() >= phi_min && topology == 0){            
+      h_phyfiller2.FillPhysicsH1(lv_epX);
+      h_phyfiller2.FillPhysicsH2(lv_epkpX);
+
+      h_phi_epkpX_phicut->Fill(lv_epkpX.M());
+
+      phi_lv_t =  lv_target - lv_pr;
+      phi_t = -phi_lv_t.Mag();
+      phi_lv_q =  lv_ebeam - lv_el;
+      phi_xb = 4*lv_ebeam.E()*lv_el.E() * TMath::Sin( lv_ebeam.Vect().Angle(lv_el.Vect() )/2.0 ) * TMath::Sin( lv_ebeam.Vect().Angle(lv_el.Vect() )/2.0 ) / (2.0*lv_target.M()*(lv_ebeam.E()-lv_el.E())) ;
+      phi_q2 = -phi_lv_q.Mag2();
+      
+    }
+
+    TLorentzVector lb_lv_t(0,0,0,0);
+    double lb_t = 0.0; 
+    TLorentzVector lb_lv_q(0,0,0,0);// =  lv_ebeam - lv_el;
+    double lb_xb = 0.0;//4*lv_ebeam.E()*lv_el.E() * TMath::Sin( lv_ebeam.Vect().Angle(lv_el.Vect() )/2.0 ) * TMath::Sin( lv_ebeam.Vect().Angle(lv_el.Vect() )/2.0 ) / (2.0*lv_target.M()*(lv_ebeam.E()-lv_el.E())) ;
+    double lb_q2 = 0.0;//-phi_lv_q.Mag2();
+
+    
+    //CUT ON EPKPX MASS LOOK AT PHI
+    if( lv_epkpX.M() <= kp_max && lv_epkpX.M() >= kp_min ){
+      h_phyfiller3.FillPhysicsH1(lv_epX);
+      h_phyfiller3.FillPhysicsH2(lv_epkpX);
+      h_phi_epX_kpcut->Fill(lv_epX.M());
+
+     
+    }
+
+    
+    ////////////////////////////////////////////////////////////////
+
+    /////////////////////////////////////////////////////////////////
+    //LAMBDA(1520 )  MESON RESULTS   
+    if( lv_ekpX.M() <= 1.540 && lv_ekpX.M() >= 1.500 ){
+      h_phyfiller4.FillPhysicsH1(lv_ekpX);
+      h_phyfiller4.FillPhysicsH2(lv_epkpX);          
+
+      h_phi_t->Fill(phi_t);
+      h_phi_xb->Fill(phi_xb);
+      h_phi_xbt->Fill(phi_xb,phi_t);
+      h_phi_q2x->Fill(phi_xb,phi_q2);
+      h_phi_q2t->Fill(phi_t,phi_q2);
+
+      lb_lv_t =  lv_target - lv_pr;
+      lb_t = -phi_lv_t.Mag();
+      lb_lv_q =  lv_ebeam - lv_el;
+      lb_xb = 4*lv_ebeam.E()*lv_el.E() * TMath::Sin( lv_ebeam.Vect().Angle(lv_el.Vect() )/2.0 ) * TMath::Sin( lv_ebeam.Vect().Angle(lv_el.Vect() )/2.0 ) / (2.0*lv_target.M()*(lv_ebeam.E()-lv_el.E())) ;
+      lb_q2 = -phi_lv_q.Mag2();
+
+    }
+
+    h_q2->Fill(phi_q2,lb_q2);
+    h_xb->Fill(phi_xb,lb_xb);
+    h_t->Fill(phi_t,lb_t);
+
+    
+  }
+  
+  /*h_filler.PrintAllHisto();
+  h_phyfiller.PrintAllHisto();
+  h_phyfiller2.PrintAllHisto();
+  h_phyfiller3.PrintAllHisto();
+  h_phyfiller4.PrintAllHisto();
+  */
+
+  TCanvas c1("c1","",900,450);
+  gStyle->SetOptStat(000000);
+  c1.Divide(2,1);
+  c1.cd(1);
+  h_phi_epX_n->SetTitle("Missing Mass epX");
+  h_phi_epX_n->GetXaxis()->SetTitle("Missing Mass epX [GeV]");
+  h_phi_epX_n->GetXaxis()->CenterTitle();
+  h_phi_epX_n->Draw();  
+  c1.Update();
+  TVirtualPad *p1 = c1.GetPad(1);
+  double ymax = gPad->GetUymax();
+  std::cout << ymax << std::endl;  
+  TBox *phi_reg = new TBox(phi_min, 0.0, phi_max, ymax );
+  phi_reg->SetFillColorAlpha(kBlue-4,0.35);
+  phi_reg->Draw("same");
+  c1.cd(2);
+  h_phi_epkpX_phicut->SetTitle("Missing Mass of epX with cut on #phi Mass");
+  h_phi_epkpX_phicut->GetXaxis()->SetTitle("Missing Mass epK^{+}X [GeV]");
+  h_phi_epkpX_phicut->GetXaxis()->CenterTitle();
+  h_phi_epkpX_phicut->Draw();
+  c1.Print("epX_kpspectrum_phicut.pdf");
+
+  TCanvas c2("c2","",900,450);
+  gStyle->SetOptStat(000000);
+  c2.Divide(2,1);
+  c2.cd(1);
+  h_phi_epkpX_n->SetTitle("Missing Mass from epK^{+}X");
+  h_phi_epkpX_n->GetXaxis()->SetTitle("Missing Mass epK^{+}X [GeV]");
+  h_phi_epkpX_n->GetXaxis()->CenterTitle();
+  h_phi_epkpX_n->Draw(); 
+  c2.Update();
+  TVirtualPad *p2 = c2.GetPad(1);
+  TBox *kp_reg = new TBox(kp_min, 0.0, kp_max, p2->GetUymax() );
+  std::cout << " >> " << p2->GetUymax() << std::endl;
+  kp_reg->SetFillColorAlpha(kBlue-4,0.35);
+  kp_reg->Draw("same");
+  c2.cd(2);
+  h_phi_epX_kpcut->SetTitle("Missing Mass of epX with cut on K^{+} Mass");
+  h_phi_epX_kpcut->GetXaxis()->SetTitle("Missing Mass epX [GeV]");
+  h_phi_epX_kpcut->GetXaxis()->CenterTitle();
+  h_phi_epX_kpcut->Draw();
+  c2.Print("epX_phispectrum_kpcut.pdf");
+
+  //////////////////////////////////////
+  //ILLUSTRATE SPECTRUM 
+  TCanvas c3("c3","",900,900);
+  gStyle->SetOptStat(000000);
+  h_phi_epX_n->SetTitle("Missing Mass Spectrum of e'p'X");
+  h_phi_epX_n->GetXaxis()->SetTitle("Missing Mass epX [GeV]");
+  h_phi_epX_n->GetXaxis()->CenterTitle();
+  h_phi_epX_n->Draw();  
+  c3.Update();
+  TVirtualPad *p3 = c3.GetPad(1);
+  double ymax3 = gPad->GetUymax();
+  std::cout << ymax3 << std::endl;  
+  TBox *phi_reg3 = new TBox(phi_min + 0.01, 0.0, phi_max - 0.01, ymax );
+  phi_reg3->SetFillColorAlpha(kBlue-4,0.35);
+  phi_reg3->Draw("same");
+  c3.Print("epX_spectrum.pdf");
+
+  TCanvas c4("c4","",900,900);
+  c4.Divide(2,2);
+  c4.cd(1);
+  h_phi_q2t->Draw("colz");
+  c4.cd(2);
+  h_phi_xb->Draw();
+  c4.cd(3);
+  h_phi_xbt->Draw("colz");
+  c4.cd(4);
+  h_phi_q2x->Draw("colz");  
+  c4.Print("kin_phi.pdf");
+  
+  TCanvas c5("c5","",900,900);
+  c5.Divide(2,2);
+  c5.cd(1);
+  h_q2->Draw("colz");
+  c5.cd(2);
+  h_xb->Draw("colz");
+  c5.cd(3);
+  h_t->Draw("colz");  
+  c5.Print("kin_comp.pdf");  
+  
+  std::cout<< " PROGRAM ENDING " << std::endl;
+
+  return;
+}
+
+
+
